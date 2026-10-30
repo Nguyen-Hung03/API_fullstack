@@ -1,0 +1,1057 @@
+openapi: 3.0.3
+info:
+  title: Atelier Shop API
+  version: 1.0.0
+  description: |
+    Đặc tả API-first cho cửa hàng Atelier.
+
+    Quy tắc trạng thái đơn hàng: PENDING → PAID → SHIPPED.
+    PENDING hoặc PAID có thể chuyển CANCELLED. Khi hủy, tồn kho được hoàn lại.
+    SHIPPED và CANCELLED là trạng thái kết thúc.
+
+    Lỗi trả về dạng `{"code","message","details"}`.
+    201 khi tạo mới, 204 khi xóa, 400 lỗi nghiệp vụ, 404 không tìm thấy,
+    422 dữ liệu không hợp lệ, 401 chưa đăng nhập, 403 không đủ quyền.
+servers:
+  - url: http://localhost:8080
+    description: Spring Boot
+  - url: http://localhost:4010
+    description: Mock server (Prism)
+tags:
+  - name: Customers
+    description: Đăng ký và hồ sơ khách hàng
+  - name: Sessions
+    description: Đăng nhập
+  - name: Categories
+    description: Danh mục hàng hóa
+  - name: Products
+    description: Sản phẩm, tìm kiếm, lọc, phân trang
+  - name: Cart
+    description: Giỏ hàng
+  - name: Orders
+    description: Đặt hàng và trạng thái đơn
+paths:
+  /api/v1/customers:
+    post:
+      tags: [Customers]
+      operationId: registerCustomer
+      summary: Đăng ký khách hàng
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerRegister'
+      responses:
+        '201':
+          description: Đã tạo tài khoản
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/v1/customers/{customerId}:
+    get:
+      tags: [Customers]
+      operationId: getCustomer
+      summary: Xem hồ sơ
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Hồ sơ khách hàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Customers]
+      operationId: updateCustomer
+      summary: Cập nhật hồ sơ
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+      responses:
+        '200':
+          description: Hồ sơ sau cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/v1/customers/{customerId}/orders:
+    get:
+      tags: [Customers]
+      operationId: listCustomerOrders
+      summary: Lịch sử đơn hàng của khách
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Trang đơn hàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/sessions:
+    post:
+      tags: [Sessions]
+      operationId: login
+      summary: Đăng nhập
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Phiên đăng nhập
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/v1/categories:
+    get:
+      tags: [Categories]
+      operationId: listCategories
+      summary: Danh sách danh mục
+      responses:
+        '200':
+          description: Danh mục
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+              example:
+                - id: 1
+                  name: Gốm sứ
+                  description: Men tự nhiên, nung thủ công
+                - id: 2
+                  name: Vải và chăn
+                  description: Lanh, cotton, đồ trải nhà
+                - id: 3
+                  name: Đèn
+                  description: Đèn giấy và đèn mây
+                - id: 4
+                  name: Trà đạo
+                  description: Ấm, chén, trà
+    post:
+      tags: [Categories]
+      operationId: createCategory
+      summary: Tạo danh mục
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryWrite'
+      responses:
+        '201':
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/v1/categories/{categoryId}:
+    get:
+      tags: [Categories]
+      operationId: getCategory
+      summary: Chi tiết danh mục
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      responses:
+        '200':
+          description: Danh mục
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Categories]
+      operationId: updateCategory
+      summary: Cập nhật danh mục
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryWrite'
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    delete:
+      tags: [Categories]
+      operationId: deleteCategory
+      summary: Xóa danh mục
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      responses:
+        '204':
+          description: Đã xóa
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/products:
+    get:
+      tags: [Products]
+      operationId: listProducts
+      summary: Tìm kiếm sản phẩm
+      parameters:
+        - name: q
+          in: query
+          description: Từ khóa trên tên hoặc mô tả
+          schema:
+            type: string
+            maxLength: 120
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+            minimum: 0
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+            minimum: 0
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Trang sản phẩm
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPage'
+              example:
+                content:
+                  - id: 1
+                    name: Bình gốm men rạn
+                    description: Men tự nhiên, mỗi chiếc một vân.
+                    price: 450000
+                    imageUrl: https://picsum.photos/seed/atelier-binh/800/800
+                    stockQuantity: 12
+                    categoryId: 1
+                    categoryName: Gốm sứ
+                  - id: 2
+                    name: Khăn trải lanh
+                    description: Lanh dày, màu cát.
+                    price: 320000
+                    imageUrl: https://picsum.photos/seed/atelier-khan/800/800
+                    stockQuantity: 20
+                    categoryId: 2
+                    categoryName: Vải và chăn
+                  - id: 3
+                    name: Đèn bàn giấy
+                    description: Khung gỗ, chụp giấy dó.
+                    price: 540000
+                    imageUrl: https://picsum.photos/seed/atelier-den/800/800
+                    stockQuantity: 9
+                    categoryId: 3
+                    categoryName: Đèn
+                  - id: 4
+                    name: Ấm tử sa
+                    description: Dung tích nhỏ, dùng sen hoặc phổ nhĩ.
+                    price: 980000
+                    imageUrl: https://picsum.photos/seed/atelier-am/800/800
+                    stockQuantity: 7
+                    categoryId: 4
+                    categoryName: Trà đạo
+                page: 0
+                size: 12
+                totalElements: 4
+                totalPages: 1
+    post:
+      tags: [Products]
+      operationId: createProduct
+      summary: Tạo sản phẩm
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductWrite'
+      responses:
+        '201':
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/v1/products/{productId}:
+    get:
+      tags: [Products]
+      operationId: getProduct
+      summary: Chi tiết sản phẩm
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Sản phẩm
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+              example:
+                id: 1
+                name: Bình gốm men rạn
+                description: Men tự nhiên, mỗi chiếc một vân.
+                price: 450000
+                imageUrl: https://picsum.photos/seed/atelier-binh/800/800
+                stockQuantity: 12
+                categoryId: 1
+                categoryName: Gốm sứ
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Products]
+      operationId: updateProduct
+      summary: Cập nhật sản phẩm và tồn kho
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductWrite'
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    delete:
+      tags: [Products]
+      operationId: deleteProduct
+      summary: Xóa sản phẩm
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '204':
+          description: Đã xóa
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/customers/{customerId}/cart:
+    get:
+      tags: [Cart]
+      operationId: getCart
+      summary: Xem giỏ hàng
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Giỏ hàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+              example:
+                customerId: 1
+                items: []
+                totalAmount: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/customers/{customerId}/cart/items:
+    post:
+      tags: [Cart]
+      operationId: addCartItem
+      summary: Thêm sản phẩm vào giỏ
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartItemWrite'
+      responses:
+        '201':
+          description: Giỏ sau khi thêm
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/v1/customers/{customerId}/cart/items/{itemId}:
+    put:
+      tags: [Cart]
+      operationId: updateCartItem
+      summary: Đổi số lượng một dòng giỏ
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartItemUpdate'
+      responses:
+        '200':
+          description: Giỏ sau cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    delete:
+      tags: [Cart]
+      operationId: removeCartItem
+      summary: Xóa một dòng khỏi giỏ
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '204':
+          description: Đã xóa
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/orders:
+    post:
+      tags: [Orders]
+      operationId: checkout
+      summary: Đặt hàng từ giỏ
+      description: |
+        Trong một giao dịch: kiểm tra tồn kho, tính tổng tiền, tạo đơn PENDING,
+        trừ tồn kho và xóa giỏ. Thiếu hàng thì không ghi đơn.
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+      responses:
+        '201':
+          description: Đơn đã tạo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    get:
+      tags: [Orders]
+      operationId: listOrders
+      summary: Danh sách đơn cho quản trị
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Trang đơn hàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/orders/{orderId}:
+    get:
+      tags: [Orders]
+      operationId: getOrder
+      summary: Chi tiết đơn
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Đơn hàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Orders]
+      operationId: updateOrderStatus
+      summary: Đổi trạng thái đơn
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        x-codegen-request-body-name: request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusUpdate'
+      responses:
+        '200':
+          description: Đơn sau khi đổi trạng thái
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+components:
+  parameters:
+    CustomerId:
+      name: customerId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    CategoryId:
+      name: categoryId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+        default: 12
+  responses:
+    BadRequest:
+      description: Lỗi nghiệp vụ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            code: ERR_STOCK_EMPTY
+            message: Sản phẩm đã hết hàng
+            details:
+              - Bình gốm men rạn chỉ còn 0
+    Unauthorized:
+      description: Chưa đăng nhập
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Forbidden:
+      description: Không đủ quyền
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: Không tìm thấy
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unprocessable:
+      description: Dữ liệu không hợp lệ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            code: ERR_VALIDATION
+            message: Dữ liệu không hợp lệ
+            details:
+              - email: Email không đúng định dạng
+              - phone: Không đúng định dạng
+  schemas:
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: ERR_STOCK_EMPTY
+        message:
+          type: string
+          example: Sản phẩm đã hết hàng
+        details:
+          type: array
+          items:
+            type: string
+    Role:
+      type: string
+      enum: [CUSTOMER, ADMIN]
+    OrderStatus:
+      type: string
+      enum: [PENDING, PAID, SHIPPED, CANCELLED]
+    Customer:
+      type: object
+      required: [id, fullName, email, phone, role]
+      properties:
+        id:
+          type: integer
+          format: int64
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        address:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        createdAt:
+          type: string
+          format: date-time
+    CustomerRegister:
+      type: object
+      required: [fullName, email, phone, password]
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 120
+        email:
+          type: string
+          format: email
+          maxLength: 180
+        phone:
+          type: string
+          pattern: '^(0|\+84)(3|5|7|8|9)[0-9]{8}$'
+        password:
+          type: string
+          minLength: 6
+          maxLength: 72
+        address:
+          type: string
+          maxLength: 255
+    CustomerUpdate:
+      type: object
+      required: [fullName, phone]
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 120
+        phone:
+          type: string
+          pattern: '^(0|\+84)(3|5|7|8|9)[0-9]{8}$'
+        address:
+          type: string
+          maxLength: 255
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+          maxLength: 72
+    Session:
+      type: object
+      required: [token, customer]
+      properties:
+        token:
+          type: string
+        customer:
+          $ref: '#/components/schemas/Customer'
+    Category:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+    CategoryWrite:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 500
+    Product:
+      type: object
+      required: [id, name, price, stockQuantity, categoryId, categoryName]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        imageUrl:
+          type: string
+        stockQuantity:
+          type: integer
+          format: int32
+        categoryId:
+          type: integer
+          format: int64
+        categoryName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ProductWrite:
+      type: object
+      required: [name, price, stockQuantity, categoryId]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 2000
+        price:
+          type: number
+          minimum: 0
+        imageUrl:
+          type: string
+          maxLength: 500
+        stockQuantity:
+          type: integer
+          format: int32
+          minimum: 0
+        categoryId:
+          type: integer
+          format: int64
+    ProductPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    CartItem:
+      type: object
+      required: [id, productId, productName, unitPrice, quantity, lineTotal]
+      properties:
+        id:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+        imageUrl:
+          type: string
+        unitPrice:
+          type: number
+        quantity:
+          type: integer
+          format: int32
+        lineTotal:
+          type: number
+    Cart:
+      type: object
+      required: [customerId, items, totalAmount]
+      properties:
+        customerId:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        totalAmount:
+          type: number
+    CartItemWrite:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 99
+    CartItemUpdate:
+      type: object
+      required: [quantity]
+      properties:
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 99
+    OrderItem:
+      type: object
+      required: [productId, productName, unitPrice, quantity, lineTotal]
+      properties:
+        id:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+        unitPrice:
+          type: number
+        quantity:
+          type: integer
+          format: int32
+        lineTotal:
+          type: number
+    Order:
+      type: object
+      required: [id, code, customerId, customerName, status, totalAmount, items]
+      properties:
+        id:
+          type: integer
+          format: int64
+        code:
+          type: string
+          example: DH20261022-1842
+        customerId:
+          type: integer
+          format: int64
+        customerName:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        totalAmount:
+          type: number
+        note:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+    OrderPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    CheckoutRequest:
+      type: object
+      required: [customerId]
+      properties:
+        customerId:
+          type: integer
+          format: int64
+        note:
+          type: string
+          maxLength: 500
+    OrderStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'

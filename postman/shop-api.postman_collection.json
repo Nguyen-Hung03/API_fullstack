@@ -1,0 +1,279 @@
+{
+  "info": {
+    "name": "Atelier Shop API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" }
+  ],
+  "item": [
+    {
+      "name": "Từ chối đăng ký sai email và số điện thoại",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/v1/customers",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"fullName\":\"Lan\",\"email\":\"khong-phai-email\",\"phone\":\"123\",\"password\":\"secret1\"}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('422', () => pm.response.to.have.status(422));",
+            "const body = pm.response.json();",
+            "pm.test('error shape', () => {",
+            "  pm.expect(body.code).to.eql('ERR_VALIDATION');",
+            "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+            "  pm.expect(body.details).to.be.an('array').and.not.empty;",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Đăng nhập quản trị",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/v1/sessions",
+        "body": { "mode": "raw", "raw": "{\"email\":\"admin@atelier.vn\",\"password\":\"admin123\"}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.expect(body.customer.role).to.eql('ADMIN');",
+            "pm.collectionVariables.set('adminToken', body.token);"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Danh mục",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/categories" },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.expect(body.length).to.be.above(0);",
+            "pm.collectionVariables.set('categoryId', body[0].id);"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Danh sách sản phẩm",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/products?size=20" },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('200 page', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.expect(body).to.include.keys('content', 'page', 'size', 'totalElements', 'totalPages');",
+            "const product = body.content.find((item) => item.stockQuantity > 2);",
+            "pm.expect(product, 'cần một sản phẩm còn hàng').to.be.ok;",
+            "pm.collectionVariables.set('productId', product.id);",
+            "pm.collectionVariables.set('stockBefore', String(product.stockQuantity));"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Đăng ký khách",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/v1/customers",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"fullName\":\"Khách Hợp đồng\",\"email\":\"hopdong{{$timestamp}}@atelier.vn\",\"phone\":\"0902223344\",\"password\":\"secret1\",\"address\":\"Huế\"}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.expect(body.passwordHash).to.be.undefined;",
+            "pm.collectionVariables.set('email', body.email);"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Đăng nhập khách",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/v1/sessions",
+        "body": { "mode": "raw", "raw": "{\"email\":\"{{email}}\",\"password\":\"secret1\"}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "const body = pm.response.json();",
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('token', body.token);",
+            "pm.collectionVariables.set('customerId', body.customer.id);"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Thêm vào giỏ",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/customers/{{customerId}}/cart/items",
+        "body": { "mode": "raw", "raw": "{\"productId\":{{productId}},\"quantity\":1}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": ["pm.test('201', () => pm.response.to.have.status(201));"]
+        }
+      }]
+    },
+    {
+      "name": "Đặt hàng thành công",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/orders",
+        "body": { "mode": "raw", "raw": "{\"customerId\":{{customerId}},\"note\":\"Hợp đồng\"}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.expect(body.status).to.eql('PENDING');",
+            "pm.expect(body.code).to.match(/^DH/);"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Tồn kho đã giảm",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/products/{{productId}}" },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "const body = pm.response.json();",
+            "const before = Number(pm.collectionVariables.get('stockBefore'));",
+            "pm.test('stock decreased', () => pm.expect(body.stockQuantity).to.eql(before - 1));"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Tạo sản phẩm sắp hết",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Hàng hết {{$timestamp}}\",\"price\":90000,\"stockQuantity\":1,\"categoryId\":{{categoryId}},\"description\":\"Để thử hết hàng\"}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('scarceId', pm.response.json().id);"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Thêm quá tồn kho vào giỏ",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/customers/{{customerId}}/cart/items",
+        "body": { "mode": "raw", "raw": "{\"productId\":{{scarceId}},\"quantity\":2}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": ["pm.test('201', () => pm.response.to.have.status(201));"]
+        }
+      }]
+    },
+    {
+      "name": "Đặt hàng thất bại vì hết hàng",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/v1/orders",
+        "body": { "mode": "raw", "raw": "{\"customerId\":{{customerId}}}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));",
+            "const body = pm.response.json();",
+            "pm.expect(body.code).to.eql('ERR_STOCK_EMPTY');",
+            "pm.expect(body.message).to.eql('Sản phẩm đã hết hàng');",
+            "pm.expect(body.details).to.be.an('array');"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Tồn kho không đổi khi đặt thất bại",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/products/{{scarceId}}" },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('stock unchanged', () => pm.expect(pm.response.json().stockQuantity).to.eql(1));"
+          ]
+        }
+      }]
+    }
+  ]
+}

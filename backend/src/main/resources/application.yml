@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: atelier-shop
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3307/shopdb?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=Asia/Ho_Chi_Minh
+    username: root
+    password: "123456"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MariaDBDialect
+        jdbc.time_zone: UTC
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: 8080
+  error:
+    include-message: never
+    include-stacktrace: never
+
+atelier:
+  seed:
+    enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
